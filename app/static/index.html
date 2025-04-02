@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nhận Diện Biểu Cảm Khuôn Mặt</title>
+    <!-- Thêm Tailwind CSS qua CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4">
+      <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+        Nhận Diện Biểu Cảm Khuôn Mặt
+      </h1>
+
+      <!-- Layout hai cột cho desktop, một cột cho mobile -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Cột bên trái - Tab và Webcam/Upload (8/12 cột trên desktop) -->
+        <div class="lg:col-span-8 order-1">
+          <!-- Tab Navigation -->
+          <div class="flex mb-4 border-b">
+            <button
+              class="tab py-2 px-4 rounded-t-lg bg-gray-200 hover:bg-gray-300 mr-2 active"
+              data-tab="upload"
+            >
+              Tải lên hình ảnh
+            </button>
+            <button
+              class="tab py-2 px-4 rounded-t-lg bg-gray-200 hover:bg-gray-300"
+              data-tab="webcam"
+            >
+              Sử dụng Webcam
+            </button>
+          </div>
+
+          <!-- Tab Content Wrapper -->
+          <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+            <!-- Upload Tab Content -->
+            <div class="tab-content active" id="upload-tab">
+              <h2 class="text-xl font-semibold mb-4">Tải lên hình ảnh</h2>
+              <div class="mb-4">
+                <input
+                  type="file"
+                  id="imageUpload"
+                  accept="image/*"
+                  class="mb-3 block w-full"
+                />
+                <button
+                  type="button"
+                  id="submitBtn"
+                  class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+                >
+                  Phân tích
+                </button>
+              </div>
+              <div id="uploadLoading" class="text-center py-3 hidden">
+                Đang xử lý...
+              </div>
+              <div id="uploadError" class="text-red-500 mt-3 hidden"></div>
+            </div>
+
+            <!-- Webcam Tab Content -->
+            <div class="tab-content hidden" id="webcam-tab">
+              <h2 class="text-xl font-semibold mb-4">Sử dụng Webcam</h2>
+              <div class="mb-4">
+                <!-- Đã xóa select để chọn webcam -->
+
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    id="startWebcam"
+                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+                  >
+                    Bật Webcam
+                  </button>
+                  <button
+                    id="stopWebcam"
+                    class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition hidden"
+                  >
+                    Tắt Webcam
+                  </button>
+                  <button
+                    id="captureBtn"
+                    class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition hidden"
+                  >
+                    Chụp ảnh
+                  </button>
+                </div>
+              </div>
+              <div class="relative webcam-container">
+                <video
+                  id="video"
+                  class="max-w-full h-auto mx-auto hidden border border-gray-300 rounded-lg"
+                  autoplay
+                ></video>
+                <canvas
+                  id="captureCanvas"
+                  class="absolute top-0 left-0 pointer-events-none hidden"
+                ></canvas>
+              </div>
+              <div id="webcamLoading" class="text-center py-3 hidden">
+                Đang xử lý...
+              </div>
+              <div id="webcamError" class="text-red-500 mt-3 hidden"></div>
+            </div>
+          </div>
+
+          <!-- Phần kết quả (chỉ hiển thị trong cột trái) -->
+          <div
+            id="resultContainer"
+            class="bg-white p-6 rounded-lg shadow-md mb-6 hidden"
+          >
+            <!-- Kết quả phân tích sẽ được hiển thị ở đây -->
+          </div>
+        </div>
+
+        <!-- Cột bên phải - Lịch sử (4/12 cột trên desktop) -->
+        <div class="lg:col-span-4 order-2">
+          <!-- History Container -->
+          <div
+            id="historyContainer"
+            class="bg-white p-4 rounded-lg shadow-md mb-6 lg:sticky lg:top-4"
+          >
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold">Lịch sử phát hiện</h2>
+              <button
+                id="clearHistoryBtn"
+                class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+              >
+                Xóa lịch sử
+              </button>
+            </div>
+            <div
+              id="historyGrid"
+              class="divide-y divide-gray-200 overflow-y-auto max-h-[calc(100vh-150px)]"
+            >
+              <!-- Các phần tử sẽ được thêm vào đây bằng JavaScript -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      /* Thêm CSS để đảm bảo sidebar có thể cuộn độc lập */
+      @media (min-width: 1024px) {
+        #historyContainer {
+          max-height: calc(100vh - 120px);
+          height: auto;
+          overflow-y: auto;
+        }
+
+        #historyGrid {
+          height: auto;
+          max-height: calc(100vh - 200px); /* Điều chỉnh để tránh xung đột */
+        }
+      }
+
+      /* Thêm thanh cuộn đẹp hơn */
+      #historyGrid::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      #historyGrid::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+
+      #historyGrid::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 10px;
+      }
+
+      #historyGrid::-webkit-scrollbar-thumb:hover {
+        background: #999;
+      }
+    </style>
+
+    <script>
+      // Tab Switching
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const tabName = tab.getAttribute("data-tab");
+
+          // Deactivate current tabs
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) =>
+              t.classList.remove("active", "bg-white", "font-bold")
+            );
+          document
+            .querySelectorAll(".tab")
+            .forEach((t) => t.classList.add("bg-gray-200"));
+          document
+            .querySelectorAll(".tab-content")
+            .forEach((c) => c.classList.add("hidden"));
+
+          // Activate selected tab
+          tab.classList.add("active", "bg-white", "font-bold");
+          tab.classList.remove("bg-gray-200");
+          document.getElementById(`${tabName}-tab`).classList.remove("hidden");
+        });
+      });
+
+      // Cập nhật file Upload để lưu lại ảnh gốc
+      document
+        .getElementById("submitBtn")
+        .addEventListener("click", async () => {
+          const fileInput = document.getElementById("imageUpload");
+          const file = fileInput.files[0];
+
+          if (!file) {
+            showError("Vui lòng chọn một hình ảnh", "uploadError");
+            return;
+          }
+
+          const loading = document.getElementById("uploadLoading");
+          const resultContainer = document.getElementById("resultContainer");
+          const errorMessage = document.getElementById("uploadError");
+
+          // Hide old results and show loading
+          resultContainer.classList.add("hidden");
+          errorMessage.classList.add("hidden");
+          loading.classList.remove("hidden");
+
+          // Đọc file thành base64 trước khi gửi API
+          const fileReader = new FileReader();
+
+          fileReader.onload = async function (event) {
+            // Lấy base64 data từ fileReader
+            const base64Image = event.target.result.split(",")[1];
+            // Lưu vào biến để sử dụng sau
+            currentCapturedImage = base64Image;
+
+            console.log(
+              "Đã đọc file upload thành base64, độ dài:",
+              base64Image.length
+            );
+
+            // Tiếp tục xử lý upload
+            const formData = new FormData();
+            formData.append("image", file);
+
+            try {
+              const response = await fetch(
+                "http://localhost:9009/face-expression/predict",
+                {
+                  method: "POST",
+                  body: formData,
+                }
+              );
+
+              if (!response.ok) {
+                throw new Error("Lỗi kết nối đến server");
+              }
+
+              const result = await response.json();
+
+              // ĐẢM BẢO LƯU ẢNH VÀO KẾT QUẢ
+              result.image = base64Image;
+              console.log(
+                "Đã gán ảnh upload vào kết quả, độ dài base64:",
+                result.image.length
+              );
+
+              displayResult(result);
+            } catch (error) {
+              showError(error.message, "uploadError");
+            } finally {
+              loading.classList.add("hidden");
+            }
+          };
+
+          fileReader.onerror = function () {
+            showError("Không thể đọc file hình ảnh", "uploadError");
+            loading.classList.add("hidden");
+          };
+
+          // Bắt đầu đọc file dưới dạng Data URL (base64)
+          fileReader.readAsDataURL(file);
+        });
+
+      // Webcam Handling
+      let stream;
+      const video = document.getElementById("video");
+
+      // Cập nhật hàm bật webcam để không sử dụng chọn camera
+      document
+        .getElementById("startWebcam")
+        .addEventListener("click", async () => {
+          try {
+            document.getElementById("webcamError").classList.add("hidden");
+
+            // Dừng luồng hiện tại nếu đang có
+            if (window.currentStream) {
+              window.currentStream.getTracks().forEach((track) => track.stop());
+            }
+
+            // Sử dụng camera mặc định
+            const constraints = {
+              video: true,
+            };
+
+            console.log("Đang mở camera mặc định");
+
+            // Lấy stream từ camera mặc định
+            const stream = await navigator.mediaDevices.getUserMedia(
+              constraints
+            );
+            window.currentStream = stream;
+
+            // Hiển thị video từ stream
+            const video = document.getElementById("video");
+            video.srcObject = stream;
+            video.classList.remove("hidden");
+            document.getElementById("startWebcam").classList.add("hidden");
+            document.getElementById("stopWebcam").classList.remove("hidden");
+            document.getElementById("captureBtn").classList.remove("hidden");
+          } catch (error) {
+            showError(
+              `Không thể truy cập webcam: ${error.message}`,
+              "webcamError"
+            );
+          }
+        });
+
+      document.getElementById("stopWebcam").addEventListener("click", () => {
+        // Dừng stream
+        if (video.srcObject) {
+          const tracks = video.srcObject.getTracks();
+          tracks.forEach((track) => track.stop());
+          video.srcObject = null;
+        }
+
+        // Ẩn video và nút tắt
+        video.classList.add("hidden");
+        document.getElementById("stopWebcam").classList.add("hidden");
+        document.getElementById("captureBtn").classList.add("hidden");
+
+        // Hiện nút bật
+        document.getElementById("startWebcam").classList.remove("hidden");
+
+        // Dừng phát hiện khuôn mặt
+        stopFaceDetection();
+
+        // Xóa thông báo nếu có
+        const note = document.getElementById("faceNotification");
+        if (note) note.remove();
+      });
+
+      // Thêm biến toàn cục để lưu ảnh hiện tại
+      let currentCapturedImage = null;
+
+      // Thêm biến để theo dõi cooldown
+      let isCaptureCooldown = false;
+      const CAPTURE_COOLDOWN = 0; // Đặt về 0 để không có độ trễ
+      let captureTimer = null;
+      let lastCapturedHash = null; // Lưu hash của ảnh cuối cùng
+
+      // Thêm hàm để tính hash đơn giản của một chuỗi base64
+      function simpleImageHash(base64Image) {
+        if (!base64Image) return null;
+        // Lấy mẫu của ảnh (lấy 100 ký tự ở vị trí khác nhau)
+        let hash = "";
+        const sampleSize = 100;
+        const len = base64Image.length;
+        if (len < sampleSize) return base64Image;
+
+        for (let i = 0; i < sampleSize; i++) {
+          const pos = Math.floor(i * (len / sampleSize));
+          hash += base64Image.charAt(pos);
+        }
+        return hash;
+      }
+
+      // Hàm kiểm tra ảnh tương tự
+      function isSimilarToLastImage(base64Image) {
+        if (!base64Image || !lastCapturedHash) return false;
+        const currentHash = simpleImageHash(base64Image);
+        return currentHash === lastCapturedHash;
+      }
+
+      // Thêm hàm setupHistoryItemListeners để xử lý sự kiện cho mỗi mục lịch sử
+      function setupHistoryItemListeners() {
+        // Lấy tất cả các mục lịch sử
+        const historyItems = document.querySelectorAll(".history-item");
+
+        historyItems.forEach((item) => {
+          // Lấy timestamp từ thuộc tính data
+          const timestamp = item.getAttribute("data-timestamp");
+
+          // Thêm sự kiện click vào item để xem chi tiết
+          item.addEventListener("click", function (event) {
+            // Tránh xung đột với nút xóa
+            if (!event.target.closest(".delete-btn")) {
+              // Tìm mục lịch sử theo timestamp
+              const historyItem = detectionHistory.find(
+                (h) => h.timestamp == timestamp
+              );
+              if (historyItem) {
+                // Hiển thị chi tiết
+                displayHistoryDetail(historyItem);
+              }
+            }
+          });
+
+          // Thêm sự kiện cho nút xóa
+          const deleteBtn = item.querySelector(".delete-btn");
+          if (deleteBtn) {
+            deleteBtn.addEventListener("click", function (event) {
+              // Ngăn sự kiện lan ra ngoài (tránh mở chi tiết)
+              event.stopPropagation();
+
+              // Xác nhận trước khi xóa
+              if (confirm("Bạn có chắc chắn muốn xóa mục này?")) {
+                // Xóa khỏi IndexedDB
+                deleteHistoryItemFromDB(parseInt(timestamp))
+                  .then(() => {
+                    // Xóa khỏi mảng
+                    detectionHistory = detectionHistory.filter(
+                      (h) => h.timestamp != timestamp
+                    );
+                    // Cập nhật UI
+                    updateHistoryGrid();
+                    showNotification("Đã xóa mục lịch sử", "success");
+                  })
+                  .catch((error) => {
+                    console.error("Lỗi khi xóa mục lịch sử:", error);
+                    showNotification("Có lỗi khi xóa mục lịch sử", "error");
+                  });
+              }
+            });
+          }
+        });
+      }
+
+      // Cập nhật hàm updateHistoryGrid với kiểm tra tốt hơn
+      function updateHistoryGrid() {
+        const historyGrid = document.getElementById("historyGrid");
+        const emptyHistoryMessage = document.getElementById(
+          "emptyHistoryMessage"
+        );
+
+        // Kiểm tra xem các phần tử có tồn tại không và tự tạo nếu cần
+        if (!historyGrid) {
+          console.warn(
+            "Không tìm thấy phần tử historyGrid, đang tạo mới phần tử"
+          );
+
+          // Tìm container cha
+          const historyContainer = document.getElementById("historyContainer");
+          if (!historyContainer) {
+            console.error(
+              "Không tìm thấy historyContainer để thêm historyGrid"
+            );
+            return;
+          }
+
+          // Tạo phần tử historyGrid mới
+          const newHistoryGrid = document.createElement("div");
+          newHistoryGrid.id = "historyGrid";
+          newHistoryGrid.className =
+            "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4";
+
+          // Tạo phần tử emptyHistoryMessage nếu chưa có
+          if (!emptyHistoryMessage) {
+            const newEmptyMessage = document.createElement("div");
+            newEmptyMessage.id = "emptyHistoryMessage";
+            newEmptyMessage.className = "text-center py-8 text-gray-500";
+            newEmptyMessage.innerHTML =
+              "Chưa có lịch sử nhận diện nào. Hãy chụp ảnh để bắt đầu!";
+
+            // Thêm vào container
+            historyContainer.appendChild(newEmptyMessage);
+          }
+
+          // Thêm grid vào container
+          historyContainer.appendChild(newHistoryGrid);
+
+          // Cập nhật lại tham chiếu
+          return updateHistoryGrid();
+        }
+
+        // Tạo emptyHistoryMessage nếu không tìm thấy
+        if (!emptyHistoryMessage) {
+          console.warn(
+            "Không tìm thấy phần tử emptyHistoryMessage, đang tạo mới phần tử"
+          );
+
+          const historyContainer = document.getElementById("historyContainer");
+          if (historyContainer) {
+            const newEmptyMessage = document.createElement("div");
+            newEmptyMessage.id = "emptyHistoryMessage";
+            newEmptyMessage.className = "text-center py-8 text-gray-500";
+            newEmptyMessage.innerHTML =
+              "Chưa có lịch sử nhận diện nào. Hãy chụp ảnh để bắt đầu!";
+
+            // Thêm trước historyGrid
+            historyContainer.insertBefore(newEmptyMessage, historyGrid);
+          }
+        }
+
+        // Xóa nội dung hiện tại của historyGrid
+        historyGrid.innerHTML = "";
+
+        // Hiển thị thông báo nếu không có lịch sử
+        if (!detectionHistory || detectionHistory.length === 0) {
+          if (emptyHistoryMessage) {
+            emptyHistoryMessage.classList.remove("hidden");
+          }
+          return;
+        }
+
+        // Ẩn thông báo trống nếu có lịch sử
+        if (emptyHistoryMessage) {
+          emptyHistoryMessage.classList.add("hidden");
+        }
+
+        // Tạo các mục lịch sử
+        detectionHistory.forEach((item) => {
+          // Tạo phần tử mục lịch sử
+          const historyItem = document.createElement("div");
+          historyItem.className =
+            "history-item relative bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200";
+          historyItem.setAttribute("data-timestamp", item.timestamp);
+
+          // Định dạng thời gian
+          const date = new Date(item.timestamp);
+          const formattedDate = `${date.toLocaleDateString(
+            "vi-VN"
+          )} ${date.toLocaleTimeString("vi-VN")}`;
+
+          // Nội dung mục lịch sử
+          historyItem.innerHTML = `
+            <div class="absolute top-2 right-2">
+              <button class="delete-btn text-gray-400 hover:text-red-500 focus:outline-none" title="Xóa">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            <div class="w-full h-32 bg-gray-100">
+              ${
+                item.image
+                  ? `<img src="data:image/jpeg;base64,${item.image}" alt="History thumbnail" class="w-full h-full object-cover">`
+                  : `<div class="w-full h-full flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>`
+              }
+            </div>
+            <div class="p-3">
+              <div class="text-xs text-gray-500 mb-1">${formattedDate}</div>
+              <div class="font-medium">${
+                item.expressions
+                  ? `${item.expressions.length} khuôn mặt`
+                  : "Không có khuôn mặt"
+              }</div>
+            </div>
+          `;
+
+          // Thêm vào grid
+          historyGrid.appendChild(historyItem);
+        });
+
+        // Thiết lập sự kiện cho các mục lịch sử
+        setupHistoryItemListeners();
+      }
+
+      // Thêm hàm hiển thị thông báo
+      function showNotification(message, type = "info") {
+        // Tạo phần tử thông báo nếu chưa có
+        let notificationContainer = document.getElementById(
+          "notificationContainer"
+        );
+
+        if (!notificationContainer) {
+          notificationContainer = document.createElement("div");
+          notificationContainer.id = "notificationContainer";
+          notificationContainer.className = "fixed bottom-4 right-4 z-50";
+          document.body.appendChild(notificationContainer);
+        }
+
+        // Tạo thông báo mới
+        const notification = document.createElement("div");
+        notification.className = `mb-2 p-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-0 ${
+          type === "success"
+            ? "bg-green-500 text-white"
+            : type === "error"
+            ? "bg-red-500 text-white"
+            : "bg-blue-500 text-white"
+        }`;
+
+        notification.innerHTML = message;
+
+        // Thêm vào container
+        notificationContainer.appendChild(notification);
+
+        // Tự động ẩn sau 3 giây
+        setTimeout(() => {
+          notification.classList.add("opacity-0", "translate-x-full");
+          setTimeout(() => {
+            notification.remove();
+          }, 300);
+        }, 3000);
+      }
+
+      // Cập nhật hàm xử lý nút chụp để lưu hình ảnh đúng cách
+      document
+        .getElementById("captureBtn")
+        .addEventListener("click", async () => {
+          const loading = document.getElementById("webcamLoading");
+          const resultContainer = document.getElementById("resultContainer");
+          const errorMessage = document.getElementById("webcamError");
+
+          // Hide old results and show loading
+          resultContainer.classList.add("hidden");
+          errorMessage.classList.add("hidden");
+          loading.classList.remove("hidden");
+
+          const captureCanvas = document.getElementById("captureCanvas");
+          captureCanvas.width = video.videoWidth;
+          captureCanvas.height = video.videoHeight;
+
+          const ctx = captureCanvas.getContext("2d");
+          ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+
+          // Lưu hình ảnh trước khi gửi API
+          const imageBase64 = captureCanvas
+            .toDataURL("image/jpeg")
+            .split(",")[1];
+          currentCapturedImage = imageBase64;
+
+          try {
+            // Convert base64 to blob for API request
+            const blob = await (
+              await fetch(`data:image/jpeg;base64,${currentCapturedImage}`)
+            ).blob();
+            const formData = new FormData();
+            formData.append("image", blob, "webcam-capture.jpg");
+
+            const response = await fetch(
+              "http://localhost:9009/face-expression/predict",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+            if (!response.ok) {
+              throw new Error("Lỗi kết nối đến server");
+            }
+
+            const result = await response.json();
+
+            // ĐẢM BẢO LƯU ẢNH VÀO KẾT QUẢ
+            result.image = currentCapturedImage;
+            console.log(
+              "Đã gán ảnh vào kết quả, độ dài base64:",
+              result.image.length
+            );
+
+            displayResult(result);
+          } catch (error) {
+            showError(error.message, "webcamError");
+          } finally {
+            loading.classList.add("hidden");
+          }
+        });
+
+      // Cập nhật hàm addToHistory để đảm bảo lưu đúng dữ liệu biểu cảm
+      function addToHistory(result, imageBase64) {
+        try {
+          console.log("Thêm vào lịch sử với dữ liệu:", result);
+
+          // Kiểm tra dữ liệu đầu vào
+          if (!result) {
+            console.error("Không có dữ liệu kết quả để lưu vào lịch sử");
+            return;
+          }
+
+          // Kiểm tra dữ liệu biểu cảm (có thể là detections hoặc expressions)
+          const expressionsData = result.detections || result.expressions || [];
+          console.log("Dữ liệu biểu cảm để lưu:", expressionsData);
+
+          // Tạo dữ liệu lịch sử
+          const historyItem = {
+            timestamp: Date.now(),
+            expressions: expressionsData,
+            image: imageBase64,
+          };
+
+          console.log("Đối tượng lịch sử đã tạo:", historyItem);
+
+          // Thêm vào mảng trong bộ nhớ
+          detectionHistory.unshift(historyItem);
+
+          // Lưu vào IndexedDB
+          saveHistoryToDB(historyItem)
+            .then(() => {
+              console.log("Đã lưu mục lịch sử vào IndexedDB");
+
+              // Cập nhật UI
+              updateHistoryGrid();
+
+              // Lưu vào localStorage (chỉ làm dự phòng)
+              if (checkLocalStorage()) {
+                try {
+                  localStorage.setItem(
+                    "faceDetectionHistory",
+                    JSON.stringify(detectionHistory)
+                  );
+                } catch (e) {
+                  console.warn("Không thể lưu vào localStorage:", e);
+                }
+              }
+            })
+            .catch((error) => {
+              console.error("Lỗi khi thêm vào IndexedDB:", error);
+              // Vẫn cập nhật UI dù có lỗi
+              updateHistoryGrid();
+            });
+        } catch (error) {
+          console.error("Lỗi khi thêm vào lịch sử:", error);
+        }
+      }
+
+      // Thêm hàm debug để kiểm tra cấu trúc dữ liệu
+      function debugHistoryData(data) {
+        console.group("Debug dữ liệu lịch sử");
+        console.log("Loại dữ liệu:", typeof data);
+        console.log("Có phải là null?", data === null);
+
+        if (data) {
+          console.log("Các thuộc tính:", Object.keys(data));
+
+          if (data.expressions) {
+            console.log("Số lượng biểu cảm:", data.expressions.length);
+            if (data.expressions.length > 0) {
+              console.log("Biểu cảm đầu tiên:", data.expressions[0]);
+            }
+          } else {
+            console.log("Không có thuộc tính expressions");
+          }
+
+          if (data.detections) {
+            console.log("Số lượng detections:", data.detections.length);
+            if (data.detections.length > 0) {
+              console.log("Detection đầu tiên:", data.detections[0]);
+            }
+          } else {
+            console.log("Không có thuộc tính detections");
+          }
+
+          if (data.image) {
+            console.log("Độ dài ảnh:", data.image.length);
+          } else {
+            console.log("Không có thuộc tính image");
+          }
+        }
+
+        console.groupEnd();
+      }
+
+      // Sửa hàm displayResult để đảm bảo dữ liệu biểu cảm được xử lý đúng
+      function displayResult(result, skipHistory = false) {
+        console.log("Hiển thị kết quả, skipHistory =", skipHistory);
+
+        // Debug dữ liệu nhận được
+        debugHistoryData(result);
+
+        // Trước tiên lưu một bản sao của kết quả để tránh thay đổi dữ liệu gốc
+        const resultCopy = JSON.parse(JSON.stringify(result));
+
+        // Debug logs
+        console.log(
+          "Kết quả phân tích nhận được:",
+          resultCopy.detections?.length || resultCopy.expressions?.length || 0,
+          "biểu cảm"
+        );
+
+        // Đảm bảo có trường expressions để hiển thị
+        if (!resultCopy.expressions && resultCopy.detections) {
+          resultCopy.expressions = resultCopy.detections;
+        }
+
+        // Kiểm tra xem có khuôn mặt nào được phát hiện không
+        const hasFaces =
+          resultCopy.expressions && resultCopy.expressions.length > 0;
+
+        // Chỉ lưu vào lịch sử nếu có phát hiện khuôn mặt và không yêu cầu bỏ qua lịch sử
+        if (hasFaces && !skipHistory) {
+          console.log(
+            "Phát hiện",
+            resultCopy.expressions.length,
+            "khuôn mặt, đang lưu vào lịch sử"
+          );
+          addToHistory(resultCopy, resultCopy.image);
+        } else if (!hasFaces) {
+          console.log("Không phát hiện khuôn mặt nào, bỏ qua việc lưu lịch sử");
+          // Hiển thị thông báo cho người dùng
+          showNotification("Không phát hiện khuôn mặt nào trong ảnh", "error");
+        }
+
+        // Hiển thị kết quả trong container
+        const resultContainer = document.getElementById("resultContainer");
+        resultContainer.classList.remove("hidden");
+
+        // Kiểm tra kết quả
+        if (!resultCopy.expressions || resultCopy.expressions.length === 0) {
+          resultContainer.innerHTML = `
+            <h2 class="text-xl font-bold mb-4">Kết quả phân tích</h2>
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <p class="text-yellow-700">Không phát hiện khuôn mặt nào trong hình ảnh.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Tạo nội dung hiển thị
+        let resultHTML = `
+          <h2 class="text-xl font-bold mb-4">Kết quả phân tích</h2>
+          <p class="mb-4">Đã phát hiện ${resultCopy.expressions.length} khuôn mặt trong hình ảnh.</p>
+        `;
+
+        // Tạo container cho ảnh gốc và các khuôn mặt
+        resultHTML += `
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+            <div class="lg:col-span-5">
+              <div class="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                <h3 class="bg-gray-50 px-4 py-2 font-semibold">Hình ảnh gốc</h3>
+                <div class="p-4 flex justify-center items-center">
+                  <div id="originalImageContainer" class="relative max-w-full">
+                    <!-- Ảnh gốc sẽ được thêm vào đây bởi JavaScript -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="lg:col-span-7">
+              <div class="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                <h3 class="bg-gray-50 px-4 py-2 font-semibold">Danh sách khuôn mặt</h3>
+                <div id="facesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                  <!-- Các khuôn mặt sẽ được thêm vào đây bởi JavaScript -->
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Cập nhật nội dung container
+        resultContainer.innerHTML = resultHTML;
+
+        // Thêm ảnh gốc vào container
+        const originalImageContainer = document.getElementById(
+          "originalImageContainer"
+        );
+        if (originalImageContainer && resultCopy.image) {
+          const img = document.createElement("img");
+          img.src = `data:image/jpeg;base64,${resultCopy.image}`;
+          img.className = "max-w-full";
+          img.alt = "Original image";
+
+          // Fallback nếu ảnh không tải được
+          img.onerror = function () {
+            console.error("Không thể tải ảnh gốc");
+            this.onerror = null;
+            this.src =
+              "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHoiLz48L3N2Zz4='";
+          };
+
+          originalImageContainer.appendChild(img);
+
+          // Thêm bounding box cho mỗi khuôn mặt (nếu có thông tin)
+          if (resultCopy.expressions) {
+            resultCopy.expressions.forEach((face, index) => {
+              if (face.bounding_box) {
+                const { x, y, width, height } = face.bounding_box;
+
+                // Tính toán tỷ lệ với ảnh đã hiển thị
+                img.onload = function () {
+                  const imgWidth = this.width;
+                  const imgHeight = this.height;
+
+                  // Tạo bounding box
+                  const box = document.createElement("div");
+                  box.className = "absolute border-2 border-blue-500";
+                  box.style.left = `${(x / 100) * imgWidth}px`;
+                  box.style.top = `${(y / 100) * imgHeight}px`;
+                  box.style.width = `${(width / 100) * imgWidth}px`;
+                  box.style.height = `${(height / 100) * imgHeight}px`;
+
+                  // Thêm số thứ tự
+                  const label = document.createElement("div");
+                  label.className =
+                    "absolute top-0 left-0 bg-blue-500 text-white text-xs px-1 py-0.5";
+                  label.textContent = `#${index + 1}`;
+                  box.appendChild(label);
+
+                  originalImageContainer.appendChild(box);
+                };
+              }
+            });
+          }
+        }
+
+        // Thêm các khuôn mặt vào container
+        const facesContainer = document.getElementById("facesContainer");
+        if (facesContainer && resultCopy.expressions) {
+          console.log(
+            "Đang hiển thị",
+            resultCopy.expressions.length,
+            "khuôn mặt"
+          );
+
+          // Sử dụng Promise.all để xử lý tất cả các khuôn mặt bất đồng bộ
+          Promise.all(
+            resultCopy.expressions.map(async (face, index) => {
+              try {
+                // Cắt ảnh khuôn mặt nếu có bounding box và ảnh gốc
+                let croppedImage = null;
+                if (resultCopy.image && face.bounding_box) {
+                  croppedImage = await cropFaceImage(
+                    resultCopy.image,
+                    face.bounding_box,
+                    index
+                  );
+                }
+
+                return createFaceCard(face, index, croppedImage);
+              } catch (error) {
+                console.error(`Lỗi xử lý khuôn mặt #${index + 1}:`, error);
+                // Trả về card lỗi
+                const errorCard = document.createElement("div");
+                errorCard.className =
+                  "bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 p-4";
+                errorCard.innerHTML = `
+                  <div class="text-center text-red-500">
+                    <p>Lỗi hiển thị khuôn mặt #${index + 1}</p>
+                  </div>
+                `;
+                return errorCard;
+              }
+            })
+          )
+            .then((faceCards) => {
+              // Thêm tất cả cards vào container
+              faceCards.forEach((card) => facesContainer.appendChild(card));
+            })
+            .catch((error) => {
+              console.error("Lỗi khi hiển thị các khuôn mặt:", error);
+              facesContainer.innerHTML = `
+                <div class="col-span-full bg-red-50 border-l-4 border-red-400 p-4">
+                  <p class="text-red-700">Đã xảy ra lỗi khi hiển thị khuôn mặt. Vui lòng thử lại.</p>
+                </div>
+              `;
+            });
+        } else {
+          console.error(
+            "Không tìm thấy facesContainer hoặc không có dữ liệu khuôn mặt"
+          );
+        }
+      }
+
+      // Hàm tạo các card dạng text khi không có ảnh hoặc không tải được ảnh
+      function createTextResults(expressions, container) {
+        if (!container) {
+          console.error("Container không tồn tại trong createTextResults");
+          return;
+        }
+
+        console.log(
+          "Tạo kết quả dạng text cho",
+          expressions?.length || 0,
+          "khuôn mặt"
+        );
+        container.innerHTML = "";
+
+        if (!expressions || expressions.length === 0) {
+          container.innerHTML = `
+            <div class="col-span-full bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <p class="text-yellow-700">Không có dữ liệu biểu cảm.</p>
+            </div>
+          `;
+          return;
+        }
+
+        expressions.forEach((face, index) => {
+          const textCard = document.createElement("div");
+          textCard.className =
+            "bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200 p-4";
+          console.log(face);
+          textCard.innerHTML = `
+            <h3 class="font-bold text-lg mb-2 text-center">Khuôn mặt ${
+              index + 1
+            }: ${face.expression}</h3>
+            <div class="space-y-2">
+              ${Object.entries(face.probabilities || {})
+                .sort((a, b) => b[1] - a[1])
+                .map(
+                  ([emotion, prob]) => `
+                  <div>
+                    <div class="flex justify-between text-sm mb-1">
+                      <span>${emotion}</span>
+                      <span>${Math.round(prob * 100)}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                      <div class="bg-blue-600 h-2 rounded-full" style="width: ${Math.round(
+                        prob * 100
+                      )}%"></div>
+                    </div>
+                  </div>
+                `
+                )
+                .join("")}
+            </div>
+          `;
+
+          container.appendChild(textCard);
+        });
+      }
+
+      // Hàm cắt ảnh khuôn mặt từ hình gốc
+      function cropFaceImage(base64Image, boundingBox, faceIndex) {
+        return new Promise((resolve, reject) => {
+          if (!base64Image) {
+            console.warn(`Face #${faceIndex + 1}: Không có ảnh gốc để cắt`);
+            resolve(null);
+            return;
+          }
+
+          const img = new Image();
+          img.onload = function () {
+            // Tạo canvas mới để cắt ảnh
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            let x, y, width, height;
+
+            // Kiểm tra xem bounding box có hợp lệ không
+            if (
+              boundingBox &&
+              typeof boundingBox.x === "number" &&
+              typeof boundingBox.y === "number" &&
+              typeof boundingBox.width === "number" &&
+              typeof boundingBox.height === "number" &&
+              boundingBox.width > 10 &&
+              boundingBox.height > 10
+            ) {
+              // Sử dụng bounding box đã cung cấp
+              x = Math.round(boundingBox.x);
+              y = Math.round(boundingBox.y);
+              width = Math.round(boundingBox.width);
+              height = Math.round(boundingBox.height);
+
+              // Log thông tin chi tiết - chỉ hiển thị trong console
+              console.log(
+                `Face #${
+                  faceIndex + 1
+                }: Sử dụng bounding box (${x},${y},${width},${height})`
+              );
+            } else {
+              // Tạo vùng cắt mặc định tại trung tâm hình ảnh
+              // Sử dụng 60% kích thước của ảnh gốc
+              width = Math.round(img.width * 0.6);
+              height = Math.round(img.height * 0.6);
+              x = Math.round((img.width - width) / 2);
+              y = Math.round((img.height - height) / 2);
+
+              // Chỉ ghi log vào console, không hiển thị lỗi cho người dùng
+              console.log(
+                `Face #${
+                  faceIndex + 1
+                }: Không tìm thấy bounding box hợp lệ, tạo vùng cắt tại trung tâm ảnh (${x},${y},${width},${height})`
+              );
+            }
+
+            // Đảm bảo kích thước vùng cắt không vượt quá kích thước ảnh gốc
+            x = Math.max(0, x);
+            y = Math.max(0, y);
+            width = Math.min(width, img.width - x);
+            height = Math.min(height, img.height - y);
+
+            // Kiểm tra kích thước cuối cùng
+            if (width < 10 || height < 10) {
+              console.warn(
+                `Face #${
+                  faceIndex + 1
+                }: Vùng cắt quá nhỏ (${width}x${height}), sử dụng ảnh gốc`
+              );
+              resolve(base64Image);
+              return;
+            }
+
+            // Thiết lập kích thước canvas và cắt ảnh
+            canvas.width = width;
+            canvas.height = height;
+
+            // Vẽ phần được cắt vào canvas
+            try {
+              ctx.drawImage(img, x, y, width, height, 0, 0, width, height);
+
+              // Chuyển canvas thành base64
+              const croppedImage = canvas.toDataURL("image/jpeg").split(",")[1];
+              console.log(
+                `Face #${
+                  faceIndex + 1
+                }: Đã cắt ảnh thành công, độ dài base64: ${croppedImage.length}`
+              );
+              resolve(croppedImage);
+            } catch (e) {
+              console.error(`Face #${faceIndex + 1}: Lỗi khi cắt ảnh:`, e);
+              // Trả về ảnh gốc nếu có lỗi khi cắt
+              resolve(base64Image);
+            }
+          };
+
+          img.onerror = function () {
+            console.error(
+              `Face #${faceIndex + 1}: Không thể tải ảnh gốc để cắt`
+            );
+            resolve(null);
+          };
+
+          // Tải ảnh từ base64
+          img.src = `data:image/jpeg;base64,${base64Image}`;
+        });
+      }
+
+      // Cập nhật hàm createFaceCard để padding ảnh khuôn mặt
+      function createFaceCard(face, faceIndex, croppedImage) {
+        const card = document.createElement("div");
+        card.className =
+          "bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200";
+
+        let imageHTML = "";
+
+        if (croppedImage) {
+          imageHTML = `
+            <div class="w-full h-48 overflow-hidden bg-gray-50 p-2">
+              <div class="w-full h-full flex items-center justify-center">
+                <img
+                  src="data:image/jpeg;base64,${croppedImage}"
+                  alt="Face ${faceIndex + 1}"
+                  class="max-w-full max-h-full object-contain"
+                  onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHoiLz48L3N2Zz4=';"
+                >
+              </div>
+            </div>
+          `;
+        } else {
+          // Hiển thị placeholder nếu không có ảnh
+          imageHTML = `
+            <div class="w-full h-48 flex items-center justify-center bg-gray-100">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+          `;
+        }
+
+        // Thông tin tỉ lệ chính xác
+        let accuracyHTML = "";
+        if (face.confidence !== undefined) {
+          const accuracyPercentage = Math.round(face.confidence * 100);
+          const accuracyColorClass =
+            accuracyPercentage >= 90
+              ? "text-green-600"
+              : accuracyPercentage >= 70
+              ? "text-yellow-600"
+              : "text-red-600";
+
+          accuracyHTML = `
+            <div class="flex items-center justify-between mb-2 text-sm">
+              <span>Độ chính xác:</span>
+              <span class="font-medium ${accuracyColorClass}">${accuracyPercentage}%</span>
+            </div>
+          `;
+        }
+
+        // Nội dung card với biểu cảm và xác suất
+        const contentHTML = `
+          <div class="p-4">
+            <div class="flex justify-between items-start">
+              <h3 class="font-bold text-lg mb-2">${
+                face.expression || "Không xác định"
+              }</h3>
+              <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">#${
+                faceIndex + 1
+              }</span>
+            </div>
+
+            ${accuracyHTML}
+
+            <div class="space-y-2">
+              ${Object.entries(face.probabilities || {})
+                .sort((a, b) => b[1] - a[1])
+                .map(
+                  ([emotion, prob]) => `
+                  <div>
+                    <div class="flex justify-between text-sm mb-1">
+                      <span>${emotion}</span>
+                      <span>${Math.round(prob * 100)}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                      <div class="bg-blue-600 h-2 rounded-full" style="width: ${Math.round(
+                        prob * 100
+                      )}%"></div>
+                    </div>
+                  </div>
+                `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+
+        card.innerHTML = imageHTML + contentHTML;
+        return card;
+      }
+
+      // Cập nhật hàm displayHistoryDetail để hiển thị ảnh được cắt từ bounding_box
+      async function displayHistoryDetail(historyItem) {
+        console.log("Hiển thị chi tiết lịch sử:", historyItem);
+
+        // Tạo modal nếu chưa có
+        let modalContainer = document.getElementById("detailModal");
+        if (!modalContainer) {
+          modalContainer = document.createElement("div");
+          modalContainer.id = "detailModal";
+          modalContainer.className =
+            "fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex justify-center items-center";
+          modalContainer.style.display = "none";
+          document.body.appendChild(modalContainer);
+
+          // Thêm sự kiện đóng khi click ra ngoài
+          modalContainer.addEventListener("click", function (e) {
+            if (e.target === this) {
+              this.style.display = "none";
+            }
+          });
+        }
+
+        // Tạo nội dung modal nếu chưa có
+        let modalContent = document.createElement("div");
+        modalContent.className =
+          "bg-white rounded-lg max-w-4xl w-full max-h-90vh overflow-auto";
+
+        // Hiển thị modal
+        modalContainer.innerHTML = "";
+        modalContainer.appendChild(modalContent);
+        modalContainer.style.display = "flex";
+
+        // Nội dung ban đầu với loading
+        modalContent.innerHTML = `
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-bold">Chi tiết nhận diện</h2>
+              <button class="text-gray-500 hover:text-gray-700 focus:outline-none" id="closeDetailModal">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div class="text-center py-10">
+              <div class="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              <p class="mt-2 text-gray-600">Đang tải dữ liệu...</p>
+            </div>
+          </div>
+        `;
+
+        // Thêm sự kiện đóng cho nút đóng
+        document
+          .getElementById("closeDetailModal")
+          .addEventListener("click", function () {
+            modalContainer.style.display = "none";
+          });
+
+        try {
+          // Định dạng thời gian
+          const date = new Date(historyItem.timestamp);
+          const formattedDate = `${date.toLocaleDateString(
+            "vi-VN"
+          )} ${date.toLocaleTimeString("vi-VN")}`;
+
+          // Mảng promise để xử lý cắt ảnh bất đồng bộ
+          const facesPromises = [];
+
+          // Cắt ảnh cho mỗi khuôn mặt nếu có bounding box
+          if (
+            historyItem.expressions &&
+            historyItem.expressions.length > 0 &&
+            historyItem.image
+          ) {
+            historyItem.expressions.forEach((face, index) => {
+              if (face.bounding_box) {
+                // Thêm promise cắt ảnh vào mảng
+                facesPromises.push(
+                  cropFaceImage(historyItem.image, face.bounding_box, index)
+                    .then((croppedImage) => {
+                      return {
+                        index: index,
+                        face: face,
+                        croppedImage: croppedImage,
+                      };
+                    })
+                    .catch((error) => {
+                      console.error(
+                        `Lỗi khi cắt ảnh khuôn mặt #${index + 1}:`,
+                        error
+                      );
+                      return {
+                        index: index,
+                        face: face,
+                        croppedImage: null,
+                        error: error.message,
+                      };
+                    })
+                );
+              } else {
+                // Nếu không có bounding box, trả về null cho ảnh cắt
+                facesPromises.push(
+                  Promise.resolve({
+                    index: index,
+                    face: face,
+                    croppedImage: null,
+                  })
+                );
+              }
+            });
+          }
+
+          // Đợi tất cả promises hoàn thành
+          const facesResults = await Promise.all(facesPromises);
+
+          // Chuẩn bị nội dung modal
+          let modalBody = `
+            <div class="p-6">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Chi tiết nhận diện</h2>
+                <button class="text-gray-500 hover:text-gray-700 focus:outline-none" id="closeDetailModal">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div class="text-sm text-gray-500 mb-4">${formattedDate}</div>
+              
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+                <div class="lg:col-span-5">
+                  <div class="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                    <h3 class="bg-gray-50 px-4 py-2 font-semibold">Hình ảnh gốc</h3>
+                    <div class="p-4 flex justify-center items-center">
+                      <div id="originalImageContainer" class="relative max-w-full">
+                        ${
+                          historyItem.image
+                            ? `<img src="data:image/jpeg;base64,${historyItem.image}" alt="Original image" class="max-w-full">`
+                            : `<div class="w-full h-32 bg-gray-100 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>`
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="lg:col-span-7">
+                  <div class="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+                    <h3 class="bg-gray-50 px-4 py-2 font-semibold">Danh sách khuôn mặt</h3>
+                    <div id="modalFacesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+                      <!-- Các khuôn mặt sẽ được thêm bằng JavaScript -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+
+          // Cập nhật nội dung modal
+          modalContent.innerHTML = modalBody;
+
+          // Thêm bounding box lên ảnh gốc nếu có thông tin
+          const originalImgContainer = modalContent.querySelector(
+            "#originalImageContainer"
+          );
+          const originalImg = originalImgContainer?.querySelector("img");
+
+          if (originalImg && historyItem.expressions) {
+            originalImg.onload = function () {
+              const imgWidth = this.width;
+              const imgHeight = this.height;
+
+              historyItem.expressions.forEach((face, idx) => {
+                if (face.bounding_box) {
+                  const { x, y, width, height } = face.bounding_box;
+
+                  // Tạo bounding box
+                  const box = document.createElement("div");
+                  box.className = "absolute border-2 border-blue-500";
+                  box.style.left = `${(x / 100) * imgWidth}px`;
+                  box.style.top = `${(y / 100) * imgHeight}px`;
+                  box.style.width = `${(width / 100) * imgWidth}px`;
+                  box.style.height = `${(height / 100) * imgHeight}px`;
+
+                  // Thêm số thứ tự
+                  const label = document.createElement("div");
+                  label.className =
+                    "absolute top-0 left-0 bg-blue-500 text-white text-xs px-1 py-0.5";
+                  label.textContent = `#${idx + 1}`;
+                  box.appendChild(label);
+
+                  originalImgContainer.appendChild(box);
+                }
+              });
+            };
+          }
+
+          // Thêm danh sách khuôn mặt vào container
+          const modalFacesContainer = modalContent.querySelector(
+            "#modalFacesContainer"
+          );
+          if (modalFacesContainer && facesResults.length > 0) {
+            facesResults.forEach((result) => {
+              const faceCard = createFaceCard(
+                result.face,
+                result.index,
+                result.croppedImage
+              );
+              modalFacesContainer.appendChild(faceCard);
+            });
+          } else if (modalFacesContainer) {
+            modalFacesContainer.innerHTML = `
+              <div class="col-span-full text-center py-4 text-gray-500">
+                Không có dữ liệu khuôn mặt
+              </div>
+            `;
+          }
+
+          // Thêm lại sự kiện đóng
+          document
+            .getElementById("closeDetailModal")
+            .addEventListener("click", function () {
+              modalContainer.style.display = "none";
+            });
+        } catch (error) {
+          console.error("Lỗi khi hiển thị chi tiết lịch sử:", error);
+          modalContent.innerHTML = `
+            <div class="p-6">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Chi tiết nhận diện</h2>
+                <button class="text-gray-500 hover:text-gray-700 focus:outline-none" id="closeDetailModal">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                <p class="text-red-700">Đã xảy ra lỗi khi hiển thị chi tiết: ${error.message}</p>
+              </div>
+            </div>
+          `;
+
+          // Thêm lại sự kiện đóng
+          document
+            .getElementById("closeDetailModal")
+            .addEventListener("click", function () {
+              modalContainer.style.display = "none";
+            });
+        }
+      }
+
+      // Thêm hàm addDeleteHistoryButton
+      function addDeleteHistoryButton() {
+        console.log("Khởi tạo nút xóa lịch sử");
+        const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+
+        if (clearHistoryBtn) {
+          clearHistoryBtn.addEventListener("click", function () {
+            if (confirm("Bạn có chắc chắn muốn xóa tất cả lịch sử?")) {
+              // Xóa tất cả lịch sử từ IndexedDB
+              clearAllHistory()
+                .then(() => {
+                  // Xóa khỏi mảng
+                  detectionHistory = [];
+                  // Cập nhật UI
+                  updateHistoryGrid();
+                  showNotification("Đã xóa tất cả lịch sử", "success");
+                })
+                .catch((error) => {
+                  console.error("Lỗi khi xóa lịch sử:", error);
+                  showNotification("Có lỗi khi xóa lịch sử", "error");
+                });
+            }
+          });
+        } else {
+          console.warn("Không tìm thấy phần tử clearHistoryBtn");
+        }
+      }
+
+      // Thêm hàm clearAllHistory
+      function clearAllHistory() {
+        return new Promise((resolve, reject) => {
+          if (!db) {
+            console.error("IndexedDB chưa được khởi tạo");
+            return reject(new Error("IndexedDB chưa được khởi tạo"));
+          }
+
+          try {
+            const transaction = db.transaction([STORE_NAME], "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+
+            // Xóa tất cả các mục
+            const request = store.clear();
+
+            request.onsuccess = function () {
+              console.log("Đã xóa tất cả lịch sử");
+              resolve();
+            };
+
+            request.onerror = function (event) {
+              console.error("Lỗi khi xóa tất cả lịch sử:", event.target.error);
+              reject(event.target.error);
+            };
+          } catch (error) {
+            console.error("Lỗi khi xóa tất cả lịch sử:", error);
+            reject(error);
+          }
+        });
+      }
+
+      // Thêm hàm deleteHistoryItemFromDB
+      function deleteHistoryItemFromDB(timestamp) {
+        return new Promise((resolve, reject) => {
+          if (!db) {
+            console.error("IndexedDB chưa được khởi tạo");
+            return reject(new Error("IndexedDB chưa được khởi tạo"));
+          }
+
+          try {
+            const transaction = db.transaction([STORE_NAME], "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+
+            // Xóa theo timestamp
+            const request = store.delete(timestamp);
+
+            request.onsuccess = function () {
+              console.log("Đã xóa mục lịch sử có timestamp:", timestamp);
+              resolve();
+            };
+
+            request.onerror = function (event) {
+              console.error("Lỗi khi xóa mục lịch sử:", event.target.error);
+              reject(event.target.error);
+            };
+          } catch (error) {
+            console.error("Lỗi khi xóa mục lịch sử:", error);
+            reject(error);
+          }
+        });
+      }
+
+      // Thêm biến isDetecting - vẫn cần giữ lại cho tính năng phát hiện thông thường
+      let isDetecting = false;
+
+      // Thêm hàm checkLocalStorage
+      function checkLocalStorage() {
+        try {
+          // Kiểm tra xem localStorage có sẵn và hoạt động không
+          const testKey = "test_localStorage";
+          localStorage.setItem(testKey, "test");
+          const testResult = localStorage.getItem(testKey);
+          localStorage.removeItem(testKey);
+
+          // Nếu giá trị đọc được khớp với giá trị đã lưu, localStorage hoạt động
+          return testResult === "test";
+        } catch (e) {
+          // Xảy ra lỗi khi truy cập localStorage (ví dụ: ở chế độ ẩn danh)
+          console.warn("localStorage không khả dụng:", e);
+          return false;
+        }
+      }
+
+      // Thêm biến cho IndexedDB
+      let db = null;
+      const DB_NAME = "FaceDetectionHistory";
+      const DB_VERSION = 1;
+      const STORE_NAME = "detectionHistory";
+
+      // Khởi tạo IndexedDB
+      function initIndexedDB() {
+        return new Promise((resolve, reject) => {
+          // Mở kết nối đến database
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+          // Xử lý khi cần nâng cấp cấu trúc
+          request.onupgradeneeded = function (event) {
+            const db = event.target.result;
+
+            // Tạo object store nếu chưa có
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME, { keyPath: "timestamp" });
+              console.log("Đã tạo object store mới");
+            }
+          };
+
+          // Xử lý khi mở thành công
+          request.onsuccess = function (event) {
+            db = event.target.result;
+            console.log("Đã kết nối thành công đến IndexedDB");
+            resolve(db);
+          };
+
+          // Xử lý khi có lỗi
+          request.onerror = function (event) {
+            console.error("Lỗi khi mở IndexedDB:", event.target.error);
+            reject(event.target.error);
+          };
+        });
+      }
+
+      // Thêm hàm loadHistoryFromDB
+      function loadHistoryFromDB() {
+        if (!db) {
+          console.error("IndexedDB chưa được khởi tạo khi cố gắng tải lịch sử");
+          return Promise.reject(new Error("IndexedDB chưa được khởi tạo"));
+        }
+
+        return new Promise((resolve, reject) => {
+          try {
+            const transaction = db.transaction([STORE_NAME], "readonly");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = function (event) {
+              const items = event.target.result;
+              console.log(`Đã tải ${items.length} mục lịch sử từ IndexedDB`);
+
+              // Lưu vào biến toàn cục
+              detectionHistory = items.sort(
+                (a, b) => b.timestamp - a.timestamp
+              );
+
+              // Cập nhật giao diện
+              updateHistoryGrid();
+
+              resolve(items);
+            };
+
+            request.onerror = function (event) {
+              console.error(
+                "Lỗi khi tải lịch sử từ IndexedDB:",
+                event.target.error
+              );
+              reject(event.target.error);
+            };
+          } catch (error) {
+            console.error("Lỗi khi tải lịch sử từ IndexedDB:", error);
+            reject(error);
+          }
+        });
+      }
+
+      // Thêm hàm saveHistoryToDB
+      function saveHistoryToDB(historyItem) {
+        return new Promise((resolve, reject) => {
+          if (!db) {
+            console.error("IndexedDB chưa được khởi tạo");
+            return reject(new Error("IndexedDB chưa được khởi tạo"));
+          }
+
+          try {
+            const transaction = db.transaction([STORE_NAME], "readwrite");
+            const store = transaction.objectStore(STORE_NAME);
+
+            // Thêm hoặc cập nhật mục lịch sử
+            const request = store.put(historyItem);
+
+            request.onsuccess = function (event) {
+              console.log(
+                "Đã lưu thành công mục lịch sử vào IndexedDB:",
+                historyItem.timestamp
+              );
+              resolve(event.target.result);
+            };
+
+            request.onerror = function (event) {
+              console.error(
+                "Lỗi khi lưu mục lịch sử vào IndexedDB:",
+                event.target.error
+              );
+              reject(event.target.error);
+            };
+          } catch (error) {
+            console.error("Lỗi khi lưu mục lịch sử vào IndexedDB:", error);
+            reject(error);
+          }
+        });
+      }
+
+      // Sửa đổi xử lý sự kiện DOMContentLoaded để khởi tạo IndexedDB
+      document.addEventListener("DOMContentLoaded", function () {
+        // Khởi tạo IndexedDB trước
+        initIndexedDB()
+          .then(() => {
+            console.log("IndexedDB đã sẵn sàng");
+
+            // Tải lịch sử từ IndexedDB
+            loadHistoryFromDB();
+          })
+          .catch((error) => {
+            console.error("Lỗi khi khởi tạo IndexedDB:", error);
+            // Vẫn tiếp tục khởi tạo các phần khác của ứng dụng
+          });
+
+        // Thêm nút xóa lịch sử
+        addDeleteHistoryButton();
+
+        // Tải lịch sử từ localStorage nếu có (chỉ dùng làm dự phòng)
+        if (checkLocalStorage()) {
+          try {
+            const savedHistory = localStorage.getItem("faceDetectionHistory");
+            if (
+              savedHistory &&
+              (!detectionHistory || detectionHistory.length === 0)
+            ) {
+              detectionHistory = JSON.parse(savedHistory);
+              updateHistoryGrid();
+            }
+          } catch (error) {
+            console.error("Lỗi khi tải lịch sử từ localStorage:", error);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

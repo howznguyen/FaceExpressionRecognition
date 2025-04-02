@@ -1,0 +1,45 @@
+networks:
+  face-expression-network:
+    driver: bridge
+# volumes:
+#   postgres:
+#   chromadb:
+#   minio_data:
+
+services:
+  builder:
+    build:
+      context: .
+    image: face-expression:latest
+    profiles:
+      - build
+
+  backend:
+    image: face-expression:latest
+    env_file: ".env"
+    container_name: face-expression-backend
+    command: app
+    ports:
+      # - "${BACKEND_PORT:-9009}:9000"
+      - 9009:9000
+    volumes:
+      - ./:/code
+    networks:
+      - face-expression-network
+
+  # postgres:
+  #   container_name: postgres
+  #   image: postgres:16
+  #   env_file: ".env"
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+  #     POSTGRES_DB: ${POSTGRES_DB:-postgres}
+  #     PGDATA: /data/postgres
+  #   volumes:
+  #     - postgres:/data/postgres
+  #   ports:
+  #     - "${POSTGRES_PORT:-5434}:${POSTGRES_PORT:-5432}"
+  #   networks:
+  #     - llmagent-network
+  #   restart: unless-stopped
