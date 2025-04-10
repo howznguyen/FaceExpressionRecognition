@@ -68,7 +68,7 @@ async def predict(face_input: FaceExpressionInput = Depends()):
     face_cascade = cv2.CascadeClassifier(
         f"models/HaarcascadeclassifierCascadeClassifier.xml"
     )
-    classifier = load_model(f"models/model.h5")
+    classifier = load_model(f"models/model.keras")
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
     results = []
