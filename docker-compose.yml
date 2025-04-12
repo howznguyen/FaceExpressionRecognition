@@ -6,6 +6,8 @@ networks:
 #   chromadb:
 #   minio_data:
 
+volumes:
+  sqlite_data:
 services:
   builder:
     build:
@@ -26,20 +28,3 @@ services:
       - ./:/code
     networks:
       - face-expression-network
-
-  # postgres:
-  #   container_name: postgres
-  #   image: postgres:16
-  #   env_file: ".env"
-  #   environment:
-  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-  #     POSTGRES_DB: ${POSTGRES_DB:-postgres}
-  #     PGDATA: /data/postgres
-  #   volumes:
-  #     - postgres:/data/postgres
-  #   ports:
-  #     - "${POSTGRES_PORT:-5434}:${POSTGRES_PORT:-5432}"
-  #   networks:
-  #     - llmagent-network
-  #   restart: unless-stopped

@@ -1,0 +1,32 @@
+/* Thêm CSS để đảm bảo sidebar có thể cuộn độc lập */
+@media (min-width: 1024px) {
+  #historyContainer {
+    max-height: calc(100vh - 120px);
+    height: auto;
+    overflow-y: auto;
+  }
+
+  #historyGrid {
+    height: auto;
+    max-height: calc(100vh - 200px); /* Điều chỉnh để tránh xung đột */
+  }
+}
+
+/* Thêm thanh cuộn đẹp hơn */
+#historyGrid::-webkit-scrollbar {
+  width: 6px;
+}
+
+#historyGrid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+#historyGrid::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+#historyGrid::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
