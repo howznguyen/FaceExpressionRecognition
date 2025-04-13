@@ -94,12 +94,6 @@ async def predict(face_input: FaceExpressionInput = Depends()):
     # Chuyển sang grayscale cho việc phân loại biểu cảm
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    yolo_model = YOLO("models/yolov11n-face.pt")  # Load mô hình YOLO
-
-    classifier = load_model(
-        "models/final_model.keras"
-    )  # Load mô hình phân loại biểu cảm
-
     # Phát hiện khuôn mặt với YOLO
     results = yolo_model(img)  # Dự đoán với YOLO
     faces = []
